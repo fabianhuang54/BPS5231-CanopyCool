@@ -40,6 +40,20 @@ export function campusBounds(d: NusData): { x0: number; z0: number; x1: number; 
   return { x0: x0 - 40, z0: z0 - 40, x1: x1 + 40, z1: z1 + 40 };
 }
 
+/**
+ * Whether an area holds something to look at: a building whose centre lies inside it, a mapped tree crown, or a dense-canopy outline with a point inside.
+ * A rectangle that only clips the edge of a building, or covers bare ground, roads and lawn, does not count.
+ */
+export function hasContent(d: NusData, { cx, cz, w, d: depth }: Area): boolean {
+  const x0 = cx - w / 2, x1 = cx + w / 2, z0 = cz - depth / 2, z1 = cz + depth / 2;
+  const inside = (x: number, z: number) => x >= x0 && x <= x1 && z >= z0 && z <= z1;
+  return (
+    d.buildings.some((b) => inside(b.r.reduce((s, p) => s + p[0], 0) / b.r.length, b.r.reduce((s, p) => s + p[1], 0) / b.r.length)) ||
+    d.trees.some(([x, z]) => inside(x, z)) ||
+    d.forest.some((f) => f.r.some((ring) => ring.some(([x, z]) => inside(x, z))))
+  );
+}
+
 const hits = (pts: Pt[], x0: number, z0: number, x1: number, z1: number) => {
   let a = 1e9, b = 1e9, c = -1e9, d = -1e9;
   for (const [x, z] of pts) { if (x < a) a = x; if (z < b) b = z; if (x > c) c = x; if (z > d) d = z; }

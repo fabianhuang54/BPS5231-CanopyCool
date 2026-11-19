@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AREA_COLORS, fillPolys } from '../lib/ground';
-import { campusBounds, type NusData } from '../lib/nus';
+import { campusBounds, hasContent, type NusData } from '../lib/nus';
 import { BLOCK_M, type Block } from '../lib/priority';
 import type { Area, Pt } from '../lib/types';
 
@@ -14,6 +14,8 @@ export function CampusMap({ data, onSelect, heat }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [drag, setDrag] = useState<{ a: Pt; b: Pt } | null>(null);
+  const [overContent, setOverContent] = useState(true); // would a click here open something?
+  const [notice, setNotice] = useState<string | null>(null);
   const bounds = useMemo(() => campusBounds(data), [data]);
 
   useEffect(() => {
@@ -59,7 +61,12 @@ export function CampusMap({ data, onSelect, heat }: Props) {
     return c;
   }, [data, heat, size.w, size.h, scale, ox, oy]);
 
+  const moved = !!drag && Math.hypot(drag.b[0] - drag.a[0], drag.b[1] - drag.a[1]) * scale > 8;
   const rect = drag && clampRect(drag.a, drag.b);
+  // what a release would pick: the dragged rectangle, or a square around a plain click
+  const pickOf = (): Area | null => (!drag ? null : moved && rect ? rect : { cx: drag.a[0], cz: drag.a[1], w: CLICK_SIDE, d: CLICK_SIDE });
+  const pick = pickOf();
+  const ok = !pick || hasContent(data, pick);
 
   useEffect(() => {
     const cv = ref.current!;
@@ -71,33 +78,37 @@ export function CampusMap({ data, onSelect, heat }: Props) {
     if (rect) {
       ctx.scale(dpr, dpr);
       const [x0, y0] = toPx([rect.cx - rect.w / 2, rect.cz - rect.d / 2]);
-      ctx.fillStyle = 'rgba(45,212,191,.18)'; ctx.fillRect(x0, y0, rect.w * scale, rect.d * scale);
-      ctx.strokeStyle = '#2dd4bf'; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, rect.w * scale, rect.d * scale);
+      ctx.fillStyle = ok ? 'rgba(45,212,191,.18)' : 'rgba(248,113,113,.18)'; ctx.fillRect(x0, y0, rect.w * scale, rect.d * scale);
+      ctx.strokeStyle = ok ? '#2dd4bf' : '#f87171'; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, rect.w * scale, rect.d * scale);
       ctx.fillStyle = '#e5ebf1'; ctx.font = '12px system-ui';
-      ctx.fillText(`${Math.round(rect.w)} × ${Math.round(rect.d)} m`, x0 + 6, y0 - 8 < 12 ? y0 + 16 : y0 - 8);
+      ctx.fillText(ok ? `${Math.round(rect.w)} × ${Math.round(rect.d)} m` : 'Nothing here to explore', x0 + 6, y0 - 8 < 12 ? y0 + 16 : y0 - 8);
     }
   });
 
   const at = (e: React.PointerEvent): Pt => { const r = ref.current!.getBoundingClientRect(); return toWorld(e.clientX - r.left, e.clientY - r.top); };
 
   return (
+    <>
     <canvas
       ref={ref}
       role="img"
       aria-label="Map of the NUS Kent Ridge campus. Drag a rectangle to explore that area in 3D."
-      style={{ width: size.w, height: size.h, cursor: 'crosshair', touchAction: 'none', display: 'block' }}
+      style={{ width: size.w, height: size.h, cursor: overContent ? 'crosshair' : 'not-allowed', touchAction: 'none', display: 'block' }}
       onPointerDown={(e) => { ref.current!.setPointerCapture(e.pointerId); const p = at(e); setDrag({ a: p, b: p }); }}
-      onPointerMove={(e) => drag && setDrag({ a: drag.a, b: at(e) })}
+      onPointerMove={(e) => {
+        const p = at(e);
+        if (drag) setDrag({ a: drag.a, b: p });
+        else setOverContent(hasContent(data, { cx: p[0], cz: p[1], w: CLICK_SIDE, d: CLICK_SIDE }));
+      }}
       onPointerUp={() => {
-        if (!drag) return;
-        const moved = Math.hypot(drag.b[0] - drag.a[0], drag.b[1] - drag.a[1]) * scale > 8;
-        const [x, z] = drag.a;
-        const pick: Area = moved && rect ? rect : { cx: x, cz: z, w: CLICK_SIDE, d: CLICK_SIDE };
-        // keep the area's centre on the campus so a stray click doesn't open an empty patch of ground
-        onSelect({ ...pick, cx: Math.min(bounds.x1, Math.max(bounds.x0, pick.cx)), cz: Math.min(bounds.z1, Math.max(bounds.z0, pick.cz)) });
+        if (!pick) return;
+        if (ok) onSelect(pick);
+        else { setNotice('Nothing there to explore. Pick an area with buildings or trees.'); setTimeout(() => setNotice(null), 2800); }
         setDrag(null);
       }}
     />
+    {notice && <div className="toast" role="status">{notice}</div>}
+    </>
   );
 }
 

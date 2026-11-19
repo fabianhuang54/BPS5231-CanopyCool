@@ -1,11 +1,9 @@
 # CanopyCool Singapore
 
-**Live app:** https://fabianhuang54.github.io/BPS5231-CanopyCool/
-
 Explore the NUS Kent Ridge campus, see where paving is sunlit, and test where trees and green roofs would help. Works offline; no API keys.
 
 1. The whole campus opens first.
-2. Drag a rectangle (or click for a 300 m square) to open that area in 3D.
+2. Drag a rectangle (or click for a 300 m square) over an area with buildings or trees to open it in 3D; empty ground can't be selected.
 3. Click a building for its height, floors, footprint, rooftop PV/greenery and shadow length.
 4. **Plant trees** to place trees: a live card shows the paving each would newly shade.
 5. **Recommend** ranks the best planting spots and shows what they would change before you accept them.

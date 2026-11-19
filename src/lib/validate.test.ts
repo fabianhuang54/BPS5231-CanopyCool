@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BUILDING_HEIGHT } from './defaults';
 import { nearRing } from './geo';
-import { nusSite, type NusData } from './nus';
+import { hasContent, nusSite, type NusData } from './nus';
 import { plantingBlock } from './planting';
 import type { Site, Tree } from './types';
 import { validateArea, validatePlan } from './validate';
@@ -96,5 +96,25 @@ describe('the building height default', () => {
     const hs = data.buildings.filter((b) => b.h || b.f).map((b) => b.h || b.f * 3.2).sort((a, b) => a - b);
     const med = (hs[Math.floor((hs.length - 1) / 2)] + hs[Math.ceil((hs.length - 1) / 2)]) / 2;
     expect(Math.abs(med - DEFAULT_BUILDING_HEIGHT)).toBeLessThanOrEqual(0.5);
+  });
+});
+
+describe('selecting an area on the campus map', () => {
+  const tiny = { buildings: [{ r: sq(-10, -10, 20), h: 12, f: 3, fb: 0 }], trees: [[300, 0, 3, 4]], forest: [{ r: [sq(600, 600, 40)], lai: 6 }] } as unknown as NusData;
+  const area = (cx: number, cz: number, w = 100, d = 100) => ({ cx, cz, w, d });
+  it('needs a building, a tree or a dense-canopy outline inside', () => {
+    expect(hasContent(tiny, area(0, 0))).toBe(true); // building
+    expect(hasContent(tiny, area(300, 10))).toBe(true); // tree
+    expect(hasContent(tiny, area(610, 610))).toBe(true); // canopy outline
+    expect(hasContent(tiny, area(150, 150))).toBe(false); // bare ground
+  });
+  it('does not count a rectangle that only clips a building edge', () => {
+    expect(hasContent(tiny, area(55, 0))).toBe(false); // covers x 5..105: the building's centre is outside
+  });
+  it('rejects ground far from the campus and accepts the campus core', () => {
+    expect(hasContent(data, area(-4000, -4000, 300, 300))).toBe(false);
+    const b = data.buildings[0].r;
+    const [x, z] = [b.reduce((t, p) => t + p[0], 0) / b.length, b.reduce((t, p) => t + p[1], 0) / b.length];
+    expect(hasContent(data, area(x, z, 80, 80))).toBe(true);
   });
 });
