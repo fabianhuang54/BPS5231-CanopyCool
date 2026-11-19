@@ -1,5 +1,7 @@
 # CanopyCool Singapore
 
+**Live app:** https://fabianhuang54.github.io/BPS5231-CanopyCool/
+
 Explore the NUS Kent Ridge campus, see where paving is sunlit, and test where trees and green roofs would help. Works offline; no API keys.
 
 1. The whole campus opens first.
